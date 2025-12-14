@@ -3,7 +3,6 @@ package com.learning.project.loveable_clone.controller;
 import com.learning.project.loveable_clone.dto.member.InviteMemberRequest;
 import com.learning.project.loveable_clone.dto.member.MemberResponse;
 import com.learning.project.loveable_clone.dto.member.UpdateMemberRoleRequest;
-import com.learning.project.loveable_clone.entity.ProjectMember;
 import com.learning.project.loveable_clone.service.ProjectMemberService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +52,7 @@ public class ProjectMemberController {
             @PathVariable Long memberId
     ) {
         Long userId = 1L;
-        return ResponseEntity.ok(projectMemberService.deleteProjectMember(projectId, memberId, userId));
+        projectMemberService.removeProjectMember(projectId, memberId, userId);
+        return ResponseEntity.noContent().build();
     }
 }
