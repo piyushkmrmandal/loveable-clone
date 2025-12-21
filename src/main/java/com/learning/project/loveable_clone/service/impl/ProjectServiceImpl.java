@@ -4,10 +4,16 @@ import com.learning.project.loveable_clone.dto.project.ProjectRequest;
 import com.learning.project.loveable_clone.dto.project.ProjectResponse;
 import com.learning.project.loveable_clone.dto.project.ProjectSummaryResponse;
 import com.learning.project.loveable_clone.entity.Project;
+import com.learning.project.loveable_clone.entity.ProjectMember;
+import com.learning.project.loveable_clone.entity.ProjectMemberId;
 import com.learning.project.loveable_clone.entity.User;
+import com.learning.project.loveable_clone.enums.ProjectRole;
+import com.learning.project.loveable_clone.error.ResourceNotFoundException;
 import com.learning.project.loveable_clone.mapper.ProjectMapper;
+import com.learning.project.loveable_clone.repository.ProjectMemberRepository;
 import com.learning.project.loveable_clone.repository.ProjectRepository;
 import com.learning.project.loveable_clone.repository.UserRepository;
+import com.learning.project.loveable_clone.security.AuthUtil;
 import com.learning.project.loveable_clone.service.ProjectService;
 import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
@@ -27,22 +33,44 @@ public class ProjectServiceImpl implements ProjectService {
     ProjectRepository projectRepository;
     UserRepository userRepository;
     ProjectMapper projectMapper;
+    ProjectMemberRepository projectMemberRepository;
+    AuthUtil authUtil;
 
     @Override
-    public ProjectResponse createProject(ProjectRequest request, Long userId) {
-        User owner = userRepository.findById(userId).orElseThrow();
+    public ProjectResponse createProject(ProjectRequest request) {
+        Long userId = authUtil.getCurrentUserId();
+
+        //This makes DB call
+        /*User owner = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("user", userId.toString()));*/
+
+        //This does not make DB call but only keep hold of userId
+        User owner = userRepository.getReferenceById(userId);
+
         Project project = Project.builder()
                 .name(request.name())
-                .owner(owner)
                 .isPublic(false)
                 .build();
 
         project = projectRepository.save(project);
+
+        ProjectMemberId projectMemberId = new ProjectMemberId(project.getId(), owner.getId());
+        ProjectMember projectMember = ProjectMember.builder()
+                .id(projectMemberId)
+                .projectRole(ProjectRole.OWNER)
+                .user(owner)
+                .acceptedAt(Instant.now())
+                .invitedAt(Instant.now())
+                .project(project)
+                .build();
+        projectMemberRepository.save(projectMember);
+
         return projectMapper.toProjectResponse(project);
     }
 
     @Override
-    public List<ProjectSummaryResponse> getUserProjects(Long userId) {
+    public List<ProjectSummaryResponse> getUserProjects() {
+        Long userId = authUtil.getCurrentUserId();
 
         //Way 1 - Using Stream
         /*return projectRepository.findAllAccessibleByUser(userId)
@@ -55,35 +83,31 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
-    public ProjectResponse getUserProjectById(Long id, Long userId) {
+    public ProjectResponse getUserProjectById(Long id) {
+        Long userId = authUtil.getCurrentUserId();
         Project project = getAccessibleProjectById(id, userId);
         return projectMapper.toProjectResponse(project);
     }
 
     @Override
-    public ProjectResponse updateProject(Long id, ProjectRequest request, Long userId) {
+    public ProjectResponse updateProject(Long id, ProjectRequest request) {
+        Long userId = authUtil.getCurrentUserId();
         Project project = getAccessibleProjectById(id, userId);
-        if (!project.getOwner().getId().equals(userId)) {
-            throw new RuntimeException("You are not the owner of this project " +
-                    "and thus not allowed to rename the project!");
-        }
         project.setName(request.name());
         return projectMapper.toProjectResponse(projectRepository.save(project));
     }
 
     @Override
-    public void softDelete(Long id, Long userId) {
+    public void softDelete(Long id) {
+        Long userId = authUtil.getCurrentUserId();
         Project project = getAccessibleProjectById(id, userId);
-        if (!project.getOwner().getId().equals(userId)) {
-            throw new RuntimeException("You are not the owner of this project and " +
-                    "thus not allowed to delete the project!");
-        }
         project.setDeletedAt(Instant.now());
         projectRepository.save(project);
     }
 
     // INTERNAL functions
-    public Project getAccessibleProjectById(Long id, Long userId) {
-        return projectRepository.findAccessibleProjectById(id, userId).orElseThrow();
+    public Project getAccessibleProjectById(Long projectId, Long userId) {
+        return projectRepository.findAccessibleProjectById(projectId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Project", projectId.toString()));
     }
 }

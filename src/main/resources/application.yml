@@ -19,3 +19,5 @@ spring:
         format_sql: true
 
 
+jwt:
+  secret-key: gbc3r79y3298r7807cb219yb98249c887b9ycx12
