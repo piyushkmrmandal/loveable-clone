@@ -14,7 +14,6 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.Optional;
 
 @Component
 public class AuthUtil {
